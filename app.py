@@ -8,6 +8,36 @@ import requests
 model = joblib.load("electricity_theft_model.pkl")
 feature_columns = joblib.load("feature_columns.pkl")
 
+# ---------------- NORMAL SAMPLE (FROM NOTEBOOK) ----------------
+sample_dict = {
+    "mtr_tariff": 11.0,
+    "mtr_status": 0.0,
+    "mtr_code": 442.0,
+    "mtr_notes": 9.0,
+    "mtr_coef": 1.0,
+    "usage_1": 200.0,
+    "usage_2": 100.0,
+    "usage_3": 200.0,
+    "usage_4": 4354.0,
+    "mtr_val_old": 437184.0,
+    "mtr_val_new": 442038.0,
+    "months_num": 1.0,
+    "mtr_type": 0.0,
+    "usage_aux": 0.0,
+    "usage_n_aux": 4854.0,
+    "date_flip_flag": 1.0,
+    "date_overlap_invoice": 0.0,
+    "date_overlap_months": 0.0,
+    "months_num_calc": 1.1,
+    "R_1": 0.0,
+    "R_2a": 0.0,
+    "R_2b": 0.0,
+    "R_3a": 1.0,
+    "R_3b": 0.0,
+    "idx_prv": 60464.0,
+    "idx_nxt": 60466.0
+}
+
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Electricity Theft Detection", layout="centered")
 
@@ -29,7 +59,7 @@ st.subheader("📥 Enter Key Meter Details")
 user_input = {}
 
 for col in important_features:
-    user_input[col] = st.number_input(f"{col}", value=0.0)
+    user_input[col] = st.number_input(f"{col}", value=sample_dict[col])
 
 # ---------------- BUILD FULL INPUT ----------------
 full_input = {}
@@ -38,7 +68,7 @@ for col in feature_columns:
     if col in user_input:
         full_input[col] = user_input[col]
     else:
-        full_input[col] = 0   # keep consistent with training
+        full_input[col] = sample_dict[col]  # 🔥 Use real sample instead of 0
 
 input_df = pd.DataFrame([full_input])
 input_df = input_df[feature_columns]
@@ -56,8 +86,7 @@ def get_risk(prob):
 def generate_explanation_llm(prob, input_df):
     API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
     
-    # ✅ Correct environment variable usage
-    headers = {"Authorization": f"Bearer {os.getenv('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')}"}
+    headers = {"Authorization": f"Bearer {os.getenv('HF_TOKEN')}"}
 
     prompt = f"""
     Electricity theft detection system:
@@ -96,7 +125,6 @@ if st.button("🔍 Predict"):
 
     prob = model.predict_proba(input_df)[:, 1][0]
 
-    # 🔥 FINAL THRESHOLD (from notebook analysis)
     threshold = 0.8
     pred = 1 if prob > threshold else 0
 
