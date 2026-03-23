@@ -44,7 +44,6 @@ input_df = pd.DataFrame([full_input])
 input_df = input_df[feature_columns]
 
 # ---------------- LOGIC ----------------
-
 def get_risk(prob):
     if prob > 0.8:
         return "🔴 HIGH RISK"
@@ -57,7 +56,7 @@ def get_risk(prob):
 def generate_explanation_llm(prob, input_df):
     API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
     
-    # ✅ FIXED: Correct environment variable
+    # ✅ CORRECT WAY
     headers = {"Authorization": f"Bearer {os.getenv('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')}"}
 
     prompt = f"""
@@ -83,32 +82,30 @@ def generate_explanation_llm(prob, input_df):
     except:
         return fallback_explanation(prob, input_df)
 
-# ---------------- FALLBACK (IMPORTANT) ----------------
+# ---------------- FALLBACK ----------------
 def fallback_explanation(prob, input_df):
-    data = input_df.iloc[0]
-
     if prob > 0.8:
-        return "High probability of theft detected due to abnormal meter behavior and unusual consumption patterns."
+        return "High probability of theft detected due to abnormal meter behavior."
     elif prob > 0.4:
-        return "Moderate irregularities observed in electricity usage. Further inspection may be required."
+        return "Moderate irregularities observed."
     else:
-        return "Electricity usage appears normal with no significant anomalies."
+        return "Electricity usage appears normal."
 
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Predict"):
 
     prob = model.predict_proba(input_df)[:, 1][0]
 
-    # ✅ FIX: Smooth probability for UI (avoid always 1.00)
+    # Smooth display
     prob_display = min(prob, 0.95)
 
-# Custom decision rule (for demo + imbalance handling)
-if prob >= 0.97:
-    pred = 1   # Theft
-else:
-    pred = 0   # Normal
-    risk = get_risk(prob)
+    # ✅ FIXED LOGIC (INSIDE BUTTON)
+    if prob >= 0.97:
+        pred = 1
+    else:
+        pred = 0
 
+    risk = get_risk(prob)
     explanation = generate_explanation_llm(prob, input_df)
 
     st.subheader("📊 Results")
