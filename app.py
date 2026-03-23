@@ -103,7 +103,10 @@ if st.button("🔍 Predict"):
     # ✅ FIX: Smooth probability for UI (avoid always 1.00)
     prob_display = min(prob, 0.95)
 
-    pred = 1 if prob > threshold else 0
+    if prob >= 0.97:
+        pred = 1   # Theft
+    else:
+        pred = 0   # Normal
     risk = get_risk(prob)
 
     explanation = generate_explanation_llm(prob, input_df)
