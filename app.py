@@ -44,7 +44,6 @@ input_df = pd.DataFrame([full_input])
 input_df = input_df[feature_columns]
 
 # ---------------- LOGIC ----------------
-threshold = 0.05
 
 def get_risk(prob):
     if prob > 0.8:
@@ -103,10 +102,11 @@ if st.button("🔍 Predict"):
     # ✅ FIX: Smooth probability for UI (avoid always 1.00)
     prob_display = min(prob, 0.95)
 
-    if prob >= 0.97:
-        pred = 1   # Theft
-    else:
-        pred = 0   # Normal
+# Custom decision rule (for demo + imbalance handling)
+if prob >= 0.97:
+    pred = 1   # Theft
+else:
+    pred = 0   # Normal
     risk = get_risk(prob)
 
     explanation = generate_explanation_llm(prob, input_df)
