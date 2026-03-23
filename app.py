@@ -44,7 +44,7 @@ input_df = pd.DataFrame([full_input])
 input_df = input_df[feature_columns]
 
 # ---------------- LOGIC ----------------
-threshold = 0.2
+threshold = 0.05
 
 def get_risk(prob):
     if prob > 0.8:
