@@ -38,7 +38,7 @@ for col in feature_columns:
     if col in user_input:
         full_input[col] = user_input[col]
     else:
-        full_input[col] = 0
+        full_input[col] = 0   # keep consistent with training
 
 input_df = pd.DataFrame([full_input])
 input_df = input_df[feature_columns]
@@ -56,7 +56,7 @@ def get_risk(prob):
 def generate_explanation_llm(prob, input_df):
     API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
     
-    # ✅ CORRECT WAY
+    # ✅ Correct environment variable usage
     headers = {"Authorization": f"Bearer {os.getenv('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')}"}
 
     prompt = f"""
@@ -77,33 +77,28 @@ def generate_explanation_llm(prob, input_df):
         if isinstance(result, list) and "generated_text" in result[0]:
             return result[0]["generated_text"]
         else:
-            return fallback_explanation(prob, input_df)
+            return fallback_explanation(prob)
 
     except:
-        return fallback_explanation(prob, input_df)
+        return fallback_explanation(prob)
 
 # ---------------- FALLBACK ----------------
-def fallback_explanation(prob, input_df):
+def fallback_explanation(prob):
     if prob > 0.8:
-        return "High probability of theft detected due to abnormal meter behavior."
+        return "High probability of electricity theft due to abnormal consumption patterns."
     elif prob > 0.4:
-        return "Moderate irregularities observed."
+        return "Moderate irregularities detected. Further inspection may be required."
     else:
-        return "Electricity usage appears normal."
+        return "Electricity usage appears normal with no significant anomalies."
 
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Predict"):
 
     prob = model.predict_proba(input_df)[:, 1][0]
 
-    # Smooth display
-    prob_display = min(prob, 0.95)
-
-    # ✅ FIXED LOGIC (INSIDE BUTTON)
-    if prob >= 0.97:
-        pred = 1
-    else:
-        pred = 0
+    # 🔥 FINAL THRESHOLD (from notebook analysis)
+    threshold = 0.8
+    pred = 1 if prob > threshold else 0
 
     risk = get_risk(prob)
     explanation = generate_explanation_llm(prob, input_df)
@@ -115,7 +110,7 @@ if st.button("🔍 Predict"):
     else:
         st.success("✅ Normal Usage")
 
-    st.write(f"**Probability of Theft:** {prob_display:.2f}")
+    st.write(f"**Probability of Theft:** {prob:.2f}")
     st.write(f"**Risk Level:** {risk}")
 
     st.subheader("🤖 AI Explanation")
