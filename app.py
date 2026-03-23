@@ -86,7 +86,7 @@ def get_risk(prob):
 def generate_explanation_llm(prob, input_df):
     API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
     
-    headers = {"Authorization": f"Bearer {os.getenv('HF_TOKEN')}"}
+    headers = {"Authorization": f"Bearer {os.getenv('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')}"}
 
     prompt = f"""
     Electricity theft detection system:
