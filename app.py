@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import os
 
 # ---------------- LOAD FILES ----------------
 model = joblib.load("electricity_theft_model.pkl")
@@ -21,7 +22,7 @@ for col in feature_columns:
     user_input[col] = st.number_input(f"{col}", value=0.0)
 
 input_df = pd.DataFrame([user_input])
-input_df = input_df[feature_columns]  # maintain order
+input_df = input_df[feature_columns]  # maintain correct order
 
 # ---------------- LOGIC ----------------
 threshold = 0.2
@@ -52,7 +53,7 @@ if st.button("🔍 Predict"):
 
     st.subheader("📊 Results")
 
-    # Prediction
+    # Prediction Output
     if pred == 1:
         st.error("⚠️ Theft Detected")
     else:
@@ -61,9 +62,15 @@ if st.button("🔍 Predict"):
     # Probability
     st.write(f"**Probability of Theft:** {prob:.3f}")
 
-    # Risk
+    # Risk Level
     st.write(f"**Risk Level:** {risk}")
 
     # Explanation
     st.subheader("🤖 AI Explanation")
     st.write(explanation)
+
+
+# ---------------- RENDER COMPATIBILITY ----------------
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8501))
+    os.system(f"streamlit run app.py --server.port {port} --server.address 0.0.0.0")
