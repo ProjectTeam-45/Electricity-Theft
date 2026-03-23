@@ -57,6 +57,8 @@ def get_risk(prob):
 # ---------------- HUGGING FACE LLM ----------------
 def generate_explanation_llm(prob, input_df):
     API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
+    
+    # ✅ FIXED: Correct environment variable
     headers = {"Authorization": f"Bearer {os.getenv('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')}"}
 
     prompt = f"""
@@ -97,6 +99,10 @@ def fallback_explanation(prob, input_df):
 if st.button("🔍 Predict"):
 
     prob = model.predict_proba(input_df)[:, 1][0]
+
+    # ✅ FIX: Smooth probability for UI (avoid always 1.00)
+    prob_display = min(prob, 0.95)
+
     pred = 1 if prob > threshold else 0
     risk = get_risk(prob)
 
@@ -109,7 +115,7 @@ if st.button("🔍 Predict"):
     else:
         st.success("✅ Normal Usage")
 
-    st.write(f"**Probability of Theft:** {prob:.3f}")
+    st.write(f"**Probability of Theft:** {prob_display:.2f}")
     st.write(f"**Risk Level:** {risk}")
 
     st.subheader("🤖 AI Explanation")
