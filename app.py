@@ -11,18 +11,36 @@ feature_columns = joblib.load("feature_columns.pkl")
 st.set_page_config(page_title="Electricity Theft Detection", layout="centered")
 
 st.title("⚡ Electricity Theft Detection System")
-st.write("Enter the meter details to detect possible electricity theft.")
+st.write("Enter key meter details to detect possible electricity theft.")
 
-# ---------------- USER INPUT ----------------
-st.subheader("📥 Input Data")
+# ---------------- IMPORTANT FEATURES (ONLY THESE SHOWN) ----------------
+important_features = [
+    "mtr_coef",
+    "R_1",
+    "usage_aux",
+    "mtr_val_old",
+    "mtr_code",
+    "usage_1"
+]
+
+st.subheader("📥 Enter Key Meter Details")
 
 user_input = {}
 
-for col in feature_columns:
+for col in important_features:
     user_input[col] = st.number_input(f"{col}", value=0.0)
 
-input_df = pd.DataFrame([user_input])
-input_df = input_df[feature_columns]  # maintain correct order
+# ---------------- BUILD FULL INPUT ----------------
+full_input = {}
+
+for col in feature_columns:
+    if col in user_input:
+        full_input[col] = user_input[col]
+    else:
+        full_input[col] = 0  # default for missing features
+
+input_df = pd.DataFrame([full_input])
+input_df = input_df[feature_columns]
 
 # ---------------- LOGIC ----------------
 threshold = 0.2
@@ -37,11 +55,11 @@ def get_risk(prob):
 
 def generate_explanation(prob):
     if prob > 0.8:
-        return "The model detected strong anomalies in usage patterns and meter behavior, indicating a high likelihood of electricity theft."
+        return "High anomalies detected in electricity usage and meter behavior, indicating strong likelihood of theft."
     elif prob > 0.4:
-        return "Some irregularities were observed in electricity usage, suggesting a moderate risk of theft."
+        return "Moderate irregularities observed in usage patterns. Further inspection may be required."
     else:
-        return "The electricity usage pattern appears normal with no significant anomalies detected."
+        return "Electricity usage appears normal with no significant suspicious activity."
 
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Predict"):
@@ -53,24 +71,18 @@ if st.button("🔍 Predict"):
 
     st.subheader("📊 Results")
 
-    # Prediction Output
     if pred == 1:
         st.error("⚠️ Theft Detected")
     else:
         st.success("✅ Normal Usage")
 
-    # Probability
     st.write(f"**Probability of Theft:** {prob:.3f}")
-
-    # Risk Level
     st.write(f"**Risk Level:** {risk}")
 
-    # Explanation
     st.subheader("🤖 AI Explanation")
     st.write(explanation)
 
-
-# ---------------- RENDER COMPATIBILITY ----------------
+# ---------------- RENDER SUPPORT ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8501))
     os.system(f"streamlit run app.py --server.port {port} --server.address 0.0.0.0")
