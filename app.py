@@ -117,7 +117,7 @@ def generate_rule_explanation(prob, input_df):
 def generate_explanation_llm(prob, input_df):
 
     API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
-    HF_TOKEN = os.getenv("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")  # ✅ FIXED
+    HF_TOKEN = os.getenv("HF_API_KEY")
 
     if not HF_TOKEN:
         return "⚠️ AI explanation unavailable (API key missing)."
