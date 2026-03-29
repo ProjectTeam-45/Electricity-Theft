@@ -20,10 +20,8 @@ feature_columns = [
 ]
 
 # ---------------- DEFAULT VALUES ----------------
-sample_dict = {col: 0 for col in feature_columns}
-
-sample_dict.update({
-"mtr_tariff": 40,
+sample_dict = {
+    "mtr_tariff": 40,
     "mtr_status": 0,
     "mtr_code": 5,
     "mtr_notes": 8,
@@ -49,7 +47,7 @@ sample_dict.update({
     "R_3b": 0,
     "idx_prv": 42732,
     "idx_nxt": 42734
-})
+}
 
 # ---------------- UI ----------------
 st.set_page_config(page_title="Electricity Theft Detection", layout="centered")
@@ -59,14 +57,8 @@ st.write("Enter meter details to detect possible electricity theft.")
 
 # ---------------- INPUT ----------------
 important_features = [
-    "mtr_coef",
-    "usage_1",
-    "usage_2",
-    "usage_3",
-    "usage_4",
-    "mtr_val_old",
-    "mtr_val_new",
-    "months_num"
+    "mtr_coef","usage_1","usage_2","usage_3","usage_4",
+    "mtr_val_old","mtr_val_new","months_num"
 ]
 
 st.subheader("📥 Enter Meter Details")
@@ -81,7 +73,7 @@ full_input = sample_dict.copy()
 full_input.update(user_input)
 
 input_df = pd.DataFrame([full_input])
-input_df = input_df[feature_columns]  # IMPORTANT
+input_df = input_df[feature_columns]
 
 # ---------------- RISK LOGIC ----------------
 def get_risk(prob):
@@ -92,34 +84,79 @@ def get_risk(prob):
     else:
         return "🟢 LOW RISK"
 
-# ---------------- FALLBACK EXPLANATION ----------------
-def fallback_explanation(prob):
-    if prob > 0.8:
-        return "High probability of electricity theft due to abnormal usage patterns."
-    elif prob > 0.4:
-        return "Moderate irregularities detected. Further inspection may be needed."
-    else:
-        return "Electricity usage appears normal."
+# ---------------- RULE-BASED EXPLANATION ----------------
+def generate_rule_explanation(prob, input_df):
+    row = input_df.iloc[0]
 
-# ---------------- OPTIONAL LLM ----------------
-def generate_explanation_llm(prob):
+    usage_total = row["usage_1"] + row["usage_2"] + row["usage_3"] + row["usage_4"]
+    meter_diff = row["mtr_val_new"] - row["mtr_val_old"]
+
+    text = ""
+
+    if prob > 0.8:
+        text += "⚠️ High risk detected.\n\n"
+    elif prob > 0.4:
+        text += "⚠️ Moderate irregularities.\n\n"
+    else:
+        text += "✅ Usage appears normal.\n\n"
+
+    text += f"- Total Consumption: {usage_total}\n"
+    text += f"- Meter Difference: {meter_diff}\n"
+    text += f"- Billing Months: {row['months_num']}\n\n"
+
+    if meter_diff == 0:
+        text += "• No meter change observed.\n"
+    elif meter_diff > usage_total * 5:
+        text += "• Meter increased unusually compared to usage.\n"
+    else:
+        text += "• Meter readings are consistent.\n"
+
+    return text
+
+# ---------------- AI EXPLANATION (UPGRADED) ----------------
+def generate_explanation_llm(prob, input_df):
 
     API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
-    HF_TOKEN = os.getenv("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")
+    HF_TOKEN = os.getenv("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")  # ✅ FIXED
 
     if not HF_TOKEN:
-        return fallback_explanation(prob)
+        return "⚠️ AI explanation unavailable (API key missing)."
 
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
+    row = input_df.iloc[0]
+
+    usage_total = row["usage_1"] + row["usage_2"] + row["usage_3"] + row["usage_4"]
+    meter_diff = row["mtr_val_new"] - row["mtr_val_old"]
+
     prompt = f"""
-    Electricity theft detection system:
-    Probability: {prob:.2f}
-    Explain simply if this is theft or normal usage.
+    You are an electricity fraud detection expert.
+
+    Analyze the data below and explain clearly:
+
+    Theft Probability: {prob:.2f}
+
+    Data:
+    - Total Consumption: {usage_total}
+    - Meter Difference: {meter_diff}
+    - Billing Months: {row['months_num']}
+
+    Explain:
+    1. Is this normal or suspicious?
+    2. Why?
+    3. Keep it simple and professional.
+
+    Answer:
     """
 
     try:
-        response = requests.post(API_URL, headers=headers, json={"inputs": prompt}, timeout=10)
+        response = requests.post(
+            API_URL,
+            headers=headers,
+            json={"inputs": prompt},
+            timeout=10
+        )
+
         result = response.json()
 
         if isinstance(result, list) and "generated_text" in result[0]:
@@ -128,19 +165,20 @@ def generate_explanation_llm(prob):
     except:
         pass
 
-    return fallback_explanation(prob)
+    return "AI explanation not available."
 
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Predict"):
 
     prob = model.predict_proba(input_df)[:, 1][0]
 
-    # Adjust threshold (matches your tuned model)
     threshold = 0.6
     pred = 1 if prob > threshold else 0
 
     risk = get_risk(prob)
-    explanation = generate_explanation_llm(prob)
+
+    rule_text = generate_rule_explanation(prob, input_df)
+    ai_text = generate_explanation_llm(prob, input_df)
 
     st.subheader("📊 Results")
 
@@ -152,8 +190,11 @@ if st.button("🔍 Predict"):
     st.write(f"**Probability of Theft:** {prob:.2f}")
     st.write(f"**Risk Level:** {risk}")
 
-    st.subheader("🤖 AI Explanation")
-    st.info(explanation)
+    st.subheader("📊 System Explanation")
+    st.info(rule_text)
+
+    st.subheader("🤖 AI Insight")
+    st.success(ai_text)
 
 # ---------------- RENDER SUPPORT ----------------
 if __name__ == "__main__":
