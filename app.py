@@ -23,19 +23,32 @@ feature_columns = [
 sample_dict = {col: 0 for col in feature_columns}
 
 sample_dict.update({
-    "mtr_tariff": 11,
+"mtr_tariff": 40,
+    "mtr_status": 0,
+    "mtr_code": 5,
+    "mtr_notes": 8,
     "mtr_coef": 1,
-    "usage_1": 200,
-    "usage_2": 50,
+    "usage_1": 28,
+    "usage_2": 0,
     "usage_3": 0,
     "usage_4": 0,
-    "mtr_val_old": 14000,
-    "mtr_val_new": 14200,
-    "months_num": 4,
-    "months_num_calc": 4,
+    "mtr_val_old": 5125,
+    "mtr_val_new": 5125,
+    "months_num": 2,
     "mtr_type": 1,
-    "idx_prv": -1,
-    "idx_nxt": -1
+    "usage_aux": 0,
+    "usage_n_aux": 28,
+    "date_flip_flag": 1,
+    "date_overlap_invoice": 0,
+    "date_overlap_months": 0,
+    "months_num_calc": 7.8,
+    "R_1": -1,
+    "R_2a": -1,
+    "R_2b": 0,
+    "R_3a": -1,
+    "R_3b": 0,
+    "idx_prv": 42732,
+    "idx_nxt": 42734
 })
 
 # ---------------- UI ----------------
