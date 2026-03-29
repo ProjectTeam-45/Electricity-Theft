@@ -7,7 +7,7 @@ import requests
 # ---------------- LOAD MODEL ----------------
 model = joblib.load("electricity_theft_model.pkl")
 
-# ✅ EXACT training features (DO NOT CHANGE)
+# ---------------- FEATURES ----------------
 feature_columns = [
     "mtr_tariff","mtr_status","mtr_code","mtr_notes","mtr_coef",
     "usage_1","usage_2","usage_3","usage_4",
@@ -64,7 +64,6 @@ important_features = [
 st.subheader("📥 Enter Meter Details")
 
 user_input = {}
-
 for col in important_features:
     user_input[col] = st.number_input(f"{col}", value=float(sample_dict[col]))
 
@@ -75,7 +74,7 @@ full_input.update(user_input)
 input_df = pd.DataFrame([full_input])
 input_df = input_df[feature_columns]
 
-# ---------------- RISK LOGIC ----------------
+# ---------------- RISK ----------------
 def get_risk(prob):
     if prob > 0.8:
         return "🔴 HIGH RISK"
@@ -84,7 +83,7 @@ def get_risk(prob):
     else:
         return "🟢 LOW RISK"
 
-# ---------------- RULE-BASED EXPLANATION ----------------
+# ---------------- RULE EXPLANATION ----------------
 def generate_rule_explanation(prob, input_df):
     row = input_df.iloc[0]
 
@@ -113,14 +112,14 @@ def generate_rule_explanation(prob, input_df):
 
     return text
 
-# ---------------- AI EXPLANATION (UPGRADED) ----------------
+# ---------------- AI EXPLANATION ----------------
 def generate_explanation_llm(prob, input_df):
 
-    API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
+    API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
     HF_TOKEN = os.getenv("HF_API_KEY")
 
     if not HF_TOKEN:
-        return "⚠️ AI explanation unavailable (API key missing)."
+        return "⚠️ AI unavailable (no API key)"
 
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
@@ -132,8 +131,6 @@ def generate_explanation_llm(prob, input_df):
     prompt = f"""
     You are an electricity fraud detection expert.
 
-    Analyze the data below and explain clearly:
-
     Theft Probability: {prob:.2f}
 
     Data:
@@ -141,12 +138,7 @@ def generate_explanation_llm(prob, input_df):
     - Meter Difference: {meter_diff}
     - Billing Months: {row['months_num']}
 
-    Explain:
-    1. Is this normal or suspicious?
-    2. Why?
-    3. Keep it simple and professional.
-
-    Answer:
+    Explain clearly if this is normal or suspicious and why.
     """
 
     try:
@@ -154,18 +146,24 @@ def generate_explanation_llm(prob, input_df):
             API_URL,
             headers=headers,
             json={"inputs": prompt},
-            timeout=10
+            timeout=20
         )
 
         result = response.json()
 
+        # ✅ Success
         if isinstance(result, list) and "generated_text" in result[0]:
             return result[0]["generated_text"]
 
-    except:
-        pass
+        # ⚠️ Model loading
+        if isinstance(result, dict) and "error" in result:
+            if "loading" in result["error"].lower():
+                return "⏳ AI model is loading... please try again."
 
-    return "AI explanation not available."
+        return "⚠️ AI service busy. Showing system explanation."
+
+    except:
+        return "⚠️ AI request failed. Showing system explanation."
 
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Predict"):
@@ -196,7 +194,7 @@ if st.button("🔍 Predict"):
     st.subheader("🤖 AI Insight")
     st.success(ai_text)
 
-# ---------------- RENDER SUPPORT ----------------
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8501))
     os.system(f"streamlit run app.py --server.port {port} --server.address 0.0.0.0")
