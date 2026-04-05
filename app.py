@@ -39,9 +39,6 @@ sample_dict = {
     "R_2b": 0,
     "R_3a": -1,
     "R_3b": 0,
-    "idx_prv": 42732,
-    "idx_nxt": 42734,
-    "idx": 1000,
     "year": 2020,
     "month": 6
 }
@@ -64,7 +61,7 @@ full_input.update(user_input)
 
 input_df = pd.DataFrame([full_input])
 
-# Match training features
+# 🔥 AUTO MATCH FEATURES (VERY IMPORTANT)
 input_df = input_df.reindex(columns=model.feature_names_in_, fill_value=0)
 
 # ---------------- RISK FUNCTION ----------------
@@ -87,27 +84,42 @@ def plot_probabilities(prob_theft, prob_normal):
         textposition='auto'
     ))
 
-    fig.update_layout(title="Prediction Probabilities")
+    fig.update_layout(
+        title="Prediction Probabilities",
+        yaxis_title="Probability",
+        height=400
+    )
+
     return fig
 
-# ---------------- FEATURE IMPORTANCE PER PREDICTION ----------------
-def explain_prediction(input_df):
-    importances = model.feature_importances_
-    features = model.feature_names_in_
+# ---------------- RULE EXPLANATION ----------------
+def generate_rule_explanation(prob_theft, input_df):
+    row = input_df.iloc[0]
 
-    values = input_df.iloc[0]
+    usage_total = row["usage_1"] + row["usage_2"] + row["usage_3"] + row["usage_4"]
+    meter_diff = row["mtr_val_new"] - row["mtr_val_old"]
 
-    # Simple impact score = value * importance
-    impact = values * importances
+    text = ""
 
-    df_imp = pd.DataFrame({
-        "Feature": features,
-        "Impact": impact
-    })
+    if prob_theft > 0.7:
+        text += "⚠️ High theft risk detected.\n\n"
+    elif prob_theft > 0.4:
+        text += "⚠️ Moderate irregularities.\n\n"
+    else:
+        text += "✅ Usage appears normal.\n\n"
 
-    df_imp = df_imp.sort_values(by="Impact", ascending=False)
+    text += f"- Total Consumption: {usage_total}\n"
+    text += f"- Meter Difference: {meter_diff}\n"
+    text += f"- Billing Months: {row['months_num']}\n\n"
 
-    return df_imp.head(5)
+    if meter_diff == 0:
+        text += "• No meter change observed.\n"
+    elif meter_diff > usage_total * 5:
+        text += "• Meter increased unusually compared to usage.\n"
+    else:
+        text += "• Meter readings are consistent.\n"
+
+    return text
 
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Analyze"):
@@ -130,14 +142,14 @@ if st.button("🔍 Analyze"):
     st.write(f"🟢 **Normal Probability:** {prob_normal:.2f}")
     st.write(f"**Risk Level:** {risk}")
 
-    # 📈 Graph
+    # 📊 Graph
     st.subheader("📈 Probability Visualization")
-    st.plotly_chart(plot_probabilities(prob_theft, prob_normal), use_container_width=True)
+    fig = plot_probabilities(prob_theft, prob_normal)
+    st.plotly_chart(fig, use_container_width=True)
 
-    # 🔍 Feature Importance
-    st.subheader("🔍 Top Influencing Features")
-    imp_df = explain_prediction(input_df)
-    st.dataframe(imp_df)
+    # 📊 Explanation
+    st.subheader("📊 System Explanation")
+    st.info(generate_rule_explanation(prob_theft, input_df))
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
