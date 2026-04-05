@@ -11,7 +11,7 @@ model = joblib.load("electricity_theft_model.pkl")
 st.set_page_config(page_title="Electricity Theft Detection", layout="centered")
 
 st.title("⚡ Electricity Theft Detection System")
-st.write("Enter meter details to assess risk of electricity theft.")
+st.write("Enter meter details to assess suspicious electricity usage patterns.")
 
 # ---------------- DEFAULT VALUES ----------------
 sample_dict = {
@@ -61,7 +61,7 @@ full_input.update(user_input)
 
 input_df = pd.DataFrame([full_input])
 
-# 🔥 AUTO MATCH FEATURES (VERY IMPORTANT)
+# 🔥 Match model features
 input_df = input_df.reindex(columns=model.feature_names_in_, fill_value=0)
 
 # ---------------- RISK FUNCTION ----------------
@@ -78,7 +78,7 @@ def plot_probabilities(prob_theft, prob_normal):
     fig = go.Figure()
 
     fig.add_trace(go.Bar(
-        x=["Theft", "Normal"],
+        x=["Suspicious", "Normal"],
         y=[prob_theft, prob_normal],
         text=[f"{prob_theft:.2f}", f"{prob_normal:.2f}"],
         textposition='auto'
@@ -92,6 +92,24 @@ def plot_probabilities(prob_theft, prob_normal):
 
     return fig
 
+# ---------------- FEATURE IMPORTANCE ----------------
+def explain_prediction(input_df):
+    importances = model.feature_importances_
+    features = model.feature_names_in_
+
+    values = input_df.iloc[0]
+
+    impact = values * importances
+
+    df_imp = pd.DataFrame({
+        "Feature": features,
+        "Impact": impact
+    })
+
+    df_imp = df_imp.sort_values(by="Impact", ascending=False)
+
+    return df_imp.head(5)
+
 # ---------------- RULE EXPLANATION ----------------
 def generate_rule_explanation(prob_theft, input_df):
     row = input_df.iloc[0]
@@ -102,9 +120,9 @@ def generate_rule_explanation(prob_theft, input_df):
     text = ""
 
     if prob_theft > 0.7:
-        text += "⚠️ High theft risk detected.\n\n"
+        text += "⚠️ High risk / suspicious pattern detected.\n\n"
     elif prob_theft > 0.4:
-        text += "⚠️ Moderate irregularities.\n\n"
+        text += "⚠️ Moderate irregularities observed.\n\n"
     else:
         text += "✅ Usage appears normal.\n\n"
 
@@ -112,8 +130,8 @@ def generate_rule_explanation(prob_theft, input_df):
     text += f"- Meter Difference: {meter_diff}\n"
     text += f"- Billing Months: {row['months_num']}\n\n"
 
-    if meter_diff == 0:
-        text += "• No meter change observed.\n"
+    if meter_diff == 0 and usage_total > 0:
+        text += "• Consumption exists but meter did not change → suspicious.\n"
     elif meter_diff > usage_total * 5:
         text += "• Meter increased unusually compared to usage.\n"
     else:
@@ -132,24 +150,28 @@ if st.button("🔍 Analyze"):
     st.subheader("📊 Results")
 
     if prob_theft > 0.7:
-        st.error(f"🔴 High Risk of Theft ({prob_theft:.2f})")
+        st.error(f"🔴 High Risk / Suspicious Pattern ({prob_theft:.2f})")
     elif prob_theft > 0.4:
         st.warning(f"🟡 Medium Risk ({prob_theft:.2f})")
     else:
         st.success(f"🟢 Low Risk ({prob_theft:.2f})")
 
-    st.write(f"🔴 **Theft Probability:** {prob_theft:.2f}")
+    st.write(f"🔴 **Suspicious Probability:** {prob_theft:.2f}")
     st.write(f"🟢 **Normal Probability:** {prob_normal:.2f}")
     st.write(f"**Risk Level:** {risk}")
 
     # 📊 Graph
     st.subheader("📈 Probability Visualization")
-    fig = plot_probabilities(prob_theft, prob_normal)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(plot_probabilities(prob_theft, prob_normal), use_container_width=True)
 
     # 📊 Explanation
     st.subheader("📊 System Explanation")
     st.info(generate_rule_explanation(prob_theft, input_df))
+
+    # 🔍 Feature Importance
+    st.subheader("🔍 Top Influencing Features")
+    imp_df = explain_prediction(input_df)
+    st.dataframe(imp_df)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
