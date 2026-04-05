@@ -7,18 +7,11 @@ import requests
 # ---------------- LOAD MODEL ----------------
 model = joblib.load("electricity_theft_model.pkl")
 
-# ---------------- FEATURES (MATCH TRAINING EXACTLY) ----------------
-feature_columns = [
-    "mtr_tariff","mtr_status","mtr_code","mtr_notes","mtr_coef",
-    "usage_1","usage_2","usage_3","usage_4",
-    "mtr_val_old","mtr_val_new","months_num","mtr_type",
-    "usage_aux","usage_n_aux","date_flip_flag",
-    "date_overlap_invoice","date_overlap_months",
-    "months_num_calc",
-    "R_1","R_2a","R_2b","R_3a","R_3b",
-    "idx_prv","idx_nxt",
-    "idx","year","month"   # ✅ FIXED
-]
+# ---------------- UI ----------------
+st.set_page_config(page_title="Electricity Theft Detection", layout="centered")
+
+st.title("⚡ Electricity Theft Detection System")
+st.write("Enter meter details to detect possible electricity theft.")
 
 # ---------------- DEFAULT VALUES ----------------
 sample_dict = {
@@ -48,18 +41,10 @@ sample_dict = {
     "R_3b": 0,
     "idx_prv": 42732,
     "idx_nxt": 42734,
-
-    # ✅ REQUIRED FEATURES
     "idx": 1000,
     "year": 2020,
     "month": 6
 }
-
-# ---------------- UI ----------------
-st.set_page_config(page_title="Electricity Theft Detection", layout="centered")
-
-st.title("⚡ Electricity Theft Detection System")
-st.write("Enter meter details to detect possible electricity theft.")
 
 # ---------------- INPUT ----------------
 important_features = [
@@ -78,7 +63,9 @@ full_input = sample_dict.copy()
 full_input.update(user_input)
 
 input_df = pd.DataFrame([full_input])
-input_df = input_df[feature_columns]
+
+# 🔥 CRITICAL FIX: auto-match training features
+input_df = input_df.reindex(columns=model.feature_names_in_, fill_value=0)
 
 # ---------------- RISK ----------------
 def get_risk(prob_theft):
@@ -168,15 +155,14 @@ def generate_explanation_llm(prob_theft, input_df):
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Predict"):
 
-    # Probability of NORMAL
+    # Probability of NORMAL (class 1)
     prob_normal = model.predict_proba(input_df)[:, 1][0]
 
-    # Convert to THEFT probability
+    # Convert to THEFT probability (class 0)
     prob_theft = 1 - prob_normal
 
     threshold = 0.6
 
-    # Prediction logic
     pred = 1 if prob_normal >= threshold else 0
 
     risk = get_risk(prob_theft)
