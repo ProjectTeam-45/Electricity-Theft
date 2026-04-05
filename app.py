@@ -7,7 +7,7 @@ import requests
 # ---------------- LOAD MODEL ----------------
 model = joblib.load("electricity_theft_model.pkl")
 
-# ---------------- FEATURES ----------------
+# ---------------- FEATURES (MATCH TRAINING EXACTLY) ----------------
 feature_columns = [
     "mtr_tariff","mtr_status","mtr_code","mtr_notes","mtr_coef",
     "usage_1","usage_2","usage_3","usage_4",
@@ -16,7 +16,8 @@ feature_columns = [
     "date_overlap_invoice","date_overlap_months",
     "months_num_calc",
     "R_1","R_2a","R_2b","R_3a","R_3b",
-    "idx_prv","idx_nxt"
+    "idx_prv","idx_nxt",
+    "idx","year","month"   # ✅ FIXED
 ]
 
 # ---------------- DEFAULT VALUES ----------------
@@ -46,7 +47,12 @@ sample_dict = {
     "R_3a": -1,
     "R_3b": 0,
     "idx_prv": 42732,
-    "idx_nxt": 42734
+    "idx_nxt": 42734,
+
+    # ✅ REQUIRED FEATURES
+    "idx": 1000,
+    "year": 2020,
+    "month": 6
 }
 
 # ---------------- UI ----------------
@@ -74,7 +80,7 @@ full_input.update(user_input)
 input_df = pd.DataFrame([full_input])
 input_df = input_df[feature_columns]
 
-# ---------------- RISK (BASED ON THEFT PROB) ----------------
+# ---------------- RISK ----------------
 def get_risk(prob_theft):
     if prob_theft > 0.7:
         return "🔴 HIGH RISK"
@@ -162,15 +168,15 @@ def generate_explanation_llm(prob_theft, input_df):
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Predict"):
 
-    # 👉 Probability of NORMAL (class 1)
+    # Probability of NORMAL
     prob_normal = model.predict_proba(input_df)[:, 1][0]
 
-    # 👉 Convert to THEFT probability
+    # Convert to THEFT probability
     prob_theft = 1 - prob_normal
 
     threshold = 0.6
 
-    # 👉 Prediction based on NORMAL probability
+    # Prediction logic
     pred = 1 if prob_normal >= threshold else 0
 
     risk = get_risk(prob_theft)
