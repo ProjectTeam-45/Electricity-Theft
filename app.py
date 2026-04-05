@@ -11,7 +11,7 @@ model = joblib.load("electricity_theft_model.pkl")
 st.set_page_config(page_title="Electricity Theft Detection", layout="centered")
 
 st.title("⚡ Electricity Theft Detection System")
-st.write("Enter meter details to detect possible electricity theft.")
+st.write("Enter meter details to assess risk of electricity theft.")
 
 # ---------------- DEFAULT VALUES ----------------
 sample_dict = {
@@ -64,10 +64,10 @@ full_input.update(user_input)
 
 input_df = pd.DataFrame([full_input])
 
-# 🔥 CRITICAL FIX: auto-match training features
+# 🔥 FIX: match training features exactly
 input_df = input_df.reindex(columns=model.feature_names_in_, fill_value=0)
 
-# ---------------- RISK ----------------
+# ---------------- RISK FUNCTION ----------------
 def get_risk(prob_theft):
     if prob_theft > 0.7:
         return "🔴 HIGH RISK"
@@ -153,33 +153,29 @@ def generate_explanation_llm(prob_theft, input_df):
         return "⚠️ AI request failed. Showing system explanation."
 
 # ---------------- PREDICTION ----------------
-if st.button("🔍 Predict"):
+if st.button("🔍 Analyze"):
 
-    # Probability of NORMAL (class 1)
     prob_normal = model.predict_proba(input_df)[:, 1][0]
-
-    # Convert to THEFT probability (class 0)
     prob_theft = 1 - prob_normal
-
-    threshold = 0.6
-
-    pred = 1 if prob_normal >= threshold else 0
 
     risk = get_risk(prob_theft)
 
-    rule_text = generate_rule_explanation(prob_theft, input_df)
-    ai_text = generate_explanation_llm(prob_theft, input_df)
-
     st.subheader("📊 Results")
 
-    if pred == 0:
-        st.error("⚠️ Theft Detected")
+    # 🔥 CLEAN OUTPUT (NO HARD LABEL)
+    if prob_theft > 0.7:
+        st.error(f"🔴 High Risk of Theft ({prob_theft:.2f})")
+    elif prob_theft > 0.4:
+        st.warning(f"🟡 Medium Risk ({prob_theft:.2f})")
     else:
-        st.success("✅ Normal Usage")
+        st.success(f"🟢 Low Risk ({prob_theft:.2f})")
 
     st.write(f"🔴 **Theft Probability:** {prob_theft:.2f}")
     st.write(f"🟢 **Normal Probability:** {prob_normal:.2f}")
     st.write(f"**Risk Level:** {risk}")
+
+    rule_text = generate_rule_explanation(prob_theft, input_df)
+    ai_text = generate_explanation_llm(prob_theft, input_df)
 
     st.subheader("📊 System Explanation")
     st.info(rule_text)
