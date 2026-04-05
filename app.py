@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import os
-import requests
+import plotly.graph_objects as go
 
 # ---------------- LOAD MODEL ----------------
 model = joblib.load("electricity_theft_model.pkl")
@@ -64,7 +64,7 @@ full_input.update(user_input)
 
 input_df = pd.DataFrame([full_input])
 
-# 🔥 FIX: match training features exactly
+# Match training features
 input_df = input_df.reindex(columns=model.feature_names_in_, fill_value=0)
 
 # ---------------- RISK FUNCTION ----------------
@@ -76,81 +76,38 @@ def get_risk(prob_theft):
     else:
         return "🟢 LOW RISK"
 
-# ---------------- RULE EXPLANATION ----------------
-def generate_rule_explanation(prob_theft, input_df):
-    row = input_df.iloc[0]
+# ---------------- GRAPH ----------------
+def plot_probabilities(prob_theft, prob_normal):
+    fig = go.Figure()
 
-    usage_total = row["usage_1"] + row["usage_2"] + row["usage_3"] + row["usage_4"]
-    meter_diff = row["mtr_val_new"] - row["mtr_val_old"]
+    fig.add_trace(go.Bar(
+        x=["Theft", "Normal"],
+        y=[prob_theft, prob_normal],
+        text=[f"{prob_theft:.2f}", f"{prob_normal:.2f}"],
+        textposition='auto'
+    ))
 
-    text = ""
+    fig.update_layout(title="Prediction Probabilities")
+    return fig
 
-    if prob_theft > 0.7:
-        text += "⚠️ High theft risk detected.\n\n"
-    elif prob_theft > 0.4:
-        text += "⚠️ Moderate irregularities.\n\n"
-    else:
-        text += "✅ Usage appears normal.\n\n"
+# ---------------- FEATURE IMPORTANCE PER PREDICTION ----------------
+def explain_prediction(input_df):
+    importances = model.feature_importances_
+    features = model.feature_names_in_
 
-    text += f"- Total Consumption: {usage_total}\n"
-    text += f"- Meter Difference: {meter_diff}\n"
-    text += f"- Billing Months: {row['months_num']}\n\n"
+    values = input_df.iloc[0]
 
-    if meter_diff == 0:
-        text += "• No meter change observed.\n"
-    elif meter_diff > usage_total * 5:
-        text += "• Meter increased unusually compared to usage.\n"
-    else:
-        text += "• Meter readings are consistent.\n"
+    # Simple impact score = value * importance
+    impact = values * importances
 
-    return text
+    df_imp = pd.DataFrame({
+        "Feature": features,
+        "Impact": impact
+    })
 
-# ---------------- AI EXPLANATION ----------------
-def generate_explanation_llm(prob_theft, input_df):
+    df_imp = df_imp.sort_values(by="Impact", ascending=False)
 
-    API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
-    HF_TOKEN = os.getenv("HF_API_KEY")
-
-    if not HF_TOKEN:
-        return "⚠️ AI unavailable (no API key)"
-
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-
-    row = input_df.iloc[0]
-
-    usage_total = row["usage_1"] + row["usage_2"] + row["usage_3"] + row["usage_4"]
-    meter_diff = row["mtr_val_new"] - row["mtr_val_old"]
-
-    prompt = f"""
-    You are an electricity fraud detection expert.
-
-    Theft Probability: {prob_theft:.2f}
-
-    Data:
-    - Total Consumption: {usage_total}
-    - Meter Difference: {meter_diff}
-    - Billing Months: {row['months_num']}
-
-    Explain clearly if this is normal or suspicious and why.
-    """
-
-    try:
-        response = requests.post(
-            API_URL,
-            headers=headers,
-            json={"inputs": prompt},
-            timeout=20
-        )
-
-        result = response.json()
-
-        if isinstance(result, list) and "generated_text" in result[0]:
-            return result[0]["generated_text"]
-
-        return "⚠️ AI service busy. Showing system explanation."
-
-    except:
-        return "⚠️ AI request failed. Showing system explanation."
+    return df_imp.head(5)
 
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Analyze"):
@@ -162,7 +119,6 @@ if st.button("🔍 Analyze"):
 
     st.subheader("📊 Results")
 
-    # 🔥 CLEAN OUTPUT (NO HARD LABEL)
     if prob_theft > 0.7:
         st.error(f"🔴 High Risk of Theft ({prob_theft:.2f})")
     elif prob_theft > 0.4:
@@ -174,14 +130,14 @@ if st.button("🔍 Analyze"):
     st.write(f"🟢 **Normal Probability:** {prob_normal:.2f}")
     st.write(f"**Risk Level:** {risk}")
 
-    rule_text = generate_rule_explanation(prob_theft, input_df)
-    ai_text = generate_explanation_llm(prob_theft, input_df)
+    # 📈 Graph
+    st.subheader("📈 Probability Visualization")
+    st.plotly_chart(plot_probabilities(prob_theft, prob_normal), use_container_width=True)
 
-    st.subheader("📊 System Explanation")
-    st.info(rule_text)
-
-    st.subheader("🤖 AI Insight")
-    st.success(ai_text)
+    # 🔍 Feature Importance
+    st.subheader("🔍 Top Influencing Features")
+    imp_df = explain_prediction(input_df)
+    st.dataframe(imp_df)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
