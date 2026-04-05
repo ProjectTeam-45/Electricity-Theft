@@ -74,17 +74,17 @@ full_input.update(user_input)
 input_df = pd.DataFrame([full_input])
 input_df = input_df[feature_columns]
 
-# ---------------- RISK ----------------
-def get_risk(prob):
-    if prob > 0.8:
+# ---------------- RISK (BASED ON THEFT PROB) ----------------
+def get_risk(prob_theft):
+    if prob_theft > 0.7:
         return "🔴 HIGH RISK"
-    elif prob > 0.4:
+    elif prob_theft > 0.4:
         return "🟡 MEDIUM RISK"
     else:
         return "🟢 LOW RISK"
 
 # ---------------- RULE EXPLANATION ----------------
-def generate_rule_explanation(prob, input_df):
+def generate_rule_explanation(prob_theft, input_df):
     row = input_df.iloc[0]
 
     usage_total = row["usage_1"] + row["usage_2"] + row["usage_3"] + row["usage_4"]
@@ -92,9 +92,9 @@ def generate_rule_explanation(prob, input_df):
 
     text = ""
 
-    if prob > 0.8:
-        text += "⚠️ High risk detected.\n\n"
-    elif prob > 0.4:
+    if prob_theft > 0.7:
+        text += "⚠️ High theft risk detected.\n\n"
+    elif prob_theft > 0.4:
         text += "⚠️ Moderate irregularities.\n\n"
     else:
         text += "✅ Usage appears normal.\n\n"
@@ -113,7 +113,7 @@ def generate_rule_explanation(prob, input_df):
     return text
 
 # ---------------- AI EXPLANATION ----------------
-def generate_explanation_llm(prob, input_df):
+def generate_explanation_llm(prob_theft, input_df):
 
     API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
     HF_TOKEN = os.getenv("HF_API_KEY")
@@ -131,7 +131,7 @@ def generate_explanation_llm(prob, input_df):
     prompt = f"""
     You are an electricity fraud detection expert.
 
-    Theft Probability: {prob:.2f}
+    Theft Probability: {prob_theft:.2f}
 
     Data:
     - Total Consumption: {usage_total}
@@ -151,14 +151,8 @@ def generate_explanation_llm(prob, input_df):
 
         result = response.json()
 
-        # ✅ Success
         if isinstance(result, list) and "generated_text" in result[0]:
             return result[0]["generated_text"]
-
-        # ⚠️ Model loading
-        if isinstance(result, dict) and "error" in result:
-            if "loading" in result["error"].lower():
-                return "⏳ AI model is loading... please try again."
 
         return "⚠️ AI service busy. Showing system explanation."
 
@@ -168,24 +162,31 @@ def generate_explanation_llm(prob, input_df):
 # ---------------- PREDICTION ----------------
 if st.button("🔍 Predict"):
 
-    prob = model.predict_proba(input_df)[:, 1][0]
+    # 👉 Probability of NORMAL (class 1)
+    prob_normal = model.predict_proba(input_df)[:, 1][0]
+
+    # 👉 Convert to THEFT probability
+    prob_theft = 1 - prob_normal
 
     threshold = 0.6
-    pred = 1 if prob > threshold else 0
 
-    risk = get_risk(prob)
+    # 👉 Prediction based on NORMAL probability
+    pred = 1 if prob_normal >= threshold else 0
 
-    rule_text = generate_rule_explanation(prob, input_df)
-    ai_text = generate_explanation_llm(prob, input_df)
+    risk = get_risk(prob_theft)
+
+    rule_text = generate_rule_explanation(prob_theft, input_df)
+    ai_text = generate_explanation_llm(prob_theft, input_df)
 
     st.subheader("📊 Results")
 
-    if pred == 1:
+    if pred == 0:
         st.error("⚠️ Theft Detected")
     else:
         st.success("✅ Normal Usage")
 
-    st.write(f"**Probability of Theft:** {prob:.2f}")
+    st.write(f"🔴 **Theft Probability:** {prob_theft:.2f}")
+    st.write(f"🟢 **Normal Probability:** {prob_normal:.2f}")
     st.write(f"**Risk Level:** {risk}")
 
     st.subheader("📊 System Explanation")
